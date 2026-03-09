@@ -6,6 +6,41 @@ Feel free to contribute additional commands via pull request.
 
 **EDIT**: It appears to be a rebranded version of [OWON SPE3103](https://www.owon.com.hk/products_owon_spe_series_%7C_spe-u_series_1_ch_dc_power_supply). [A documentation of serial commands](http://files.owon.com.cn/software/Application/SP&P_Series_Single_Channel_DC_Power_Supply_Programming_Manual.pdf) is available.
 
+## Web Controller Interface
+
+This repository includes `index.html`, a browser-based controller for the DC310S power supply using the Web Serial API.
+
+### Features
+
+- Real-time voltage, current, and power monitoring
+- Live graphing with interactive tooltips
+- Output control (on/off)
+- Set voltage and current with fine adjustment controls
+- Protection limits (OVP/OCP) configuration
+- Energy consumption tracking (Wh/mWh)
+- Data persistence using IndexedDB
+- Manual command interface for testing
+- Adjustable polling interval
+- Dark themed industrial UI
+
+### Usage
+
+1. Open `index.html` in a Web Serial API compatible browser (Chrome, Edge, Opera)
+2. Click "CONNECT" and select your DC310S serial port
+3. The interface will automatically query and display current settings
+4. Use the controls to adjust voltage, current, and limits
+5. Toggle output on/off as needed
+6. View real-time data on the live graph
+
+### Browser Compatibility
+
+Requires a browser with Web Serial API support:
+- Chrome 89+
+- Edge 89+
+- Opera 75+
+
+Note: Firefox and Safari do not currently support the Web Serial API.
+
 ## Serial Connection Settings
 
 |Setting|Value|
@@ -14,7 +49,6 @@ Feel free to contribute additional commands via pull request.
 |data bits|8|
 |parity bit|none|
 |stop bit|1|
-
 
 ## Read/Get Commands
 
@@ -35,7 +69,6 @@ Invalid commands appear to return `ERR`.
 |`current:limit?`<br />`curr:lim?`|(x)x.xxx|get measured current|
 |`voltage:limit?`<br />`volt:lim?`|(x)x.xxx|get measured voltage|
 
-
 ## Write/Set Commands
 
 Get commands are tailed with a line feed (0x0a). While the [official software](https://bit.ly/37Bwt92) appears to apply upper-case for the first three letters, commands appear to be case insensitive.
@@ -49,7 +82,6 @@ ToDo: Not sure if there is any return for valid/invalid set commands. At the mom
 |`voltage (x)x.xxx`|set voltage|
 |`current:limit (x)x.xxx`|set current limit|
 |`voltage:limit (x)x.xxx`|set voltage limit|
-
 
 ## Untested commands from OWON pdf (TODO)
 

@@ -1,0 +1,1204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DC310S Controller</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0f0f;
+    --panel: #131616;
+    --border: #1f2525;
+    --accent: #00e5a0;
+    --accent2: #ff6b35;
+    --warn: #ffd166;
+    --text: #c8d4d4;
+    --dim: #4a5a5a;
+    --volt-color: #00e5a0;
+    --amp-color: #ff6b35;
+    --watt-color: #ffd166;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Barlow Condensed', sans-serif;
+    min-height: 100vh;
+    padding: 0;
+    overflow-x: hidden;
+  }
+
+  /* scan line effect */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.03) 2px,
+      rgba(0,0,0,0.03) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+  }
+
+  .logo {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 18px;
+    letter-spacing: 4px;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+  .logo span { color: var(--dim); }
+
+  .conn-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    padding: 6px 10px;
+    outline: none;
+    cursor: pointer;
+  }
+  select:hover { border-color: var(--accent); }
+
+  .btn {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 6px 16px;
+    border: 1px solid;
+    cursor: pointer;
+    transition: all 0.15s;
+    background: transparent;
+  }
+
+  .btn-connect {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .btn-connect:hover, .btn-connect.active {
+    background: var(--accent);
+    color: var(--bg);
+  }
+  .btn-connect.connected {
+    border-color: var(--accent2);
+    color: var(--accent2);
+  }
+  .btn-connect.connected:hover {
+    background: var(--accent2);
+    color: var(--bg);
+  }
+
+  .btn-output {
+    border-color: var(--dim);
+    color: var(--dim);
+    min-width: 90px;
+  }
+  .btn-output.on {
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: 0 0 10px rgba(0,229,160,0.2);
+  }
+  .btn-output.on:hover {
+    background: var(--accent);
+    color: var(--bg);
+  }
+  .btn-output.off { border-color: var(--accent2); color: var(--accent2); }
+  .btn-output.off:hover { background: var(--accent2); color: var(--bg); }
+
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--dim);
+    transition: all 0.3s;
+  }
+  .status-dot.connected { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+
+  main {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    grid-template-rows: auto auto;
+    gap: 1px;
+    background: var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .panel {
+    background: var(--panel);
+    padding: 20px 24px;
+  }
+
+  .panel-label {
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--dim);
+    margin-bottom: 12px;
+  }
+
+  /* Big readout panels */
+  .readout-panel {
+    position: relative;
+    overflow: hidden;
+  }
+  .readout-panel::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+  .readout-panel.volt::before { background: var(--volt-color); }
+  .readout-panel.amp::before  { background: var(--amp-color); }
+  .readout-panel.watt::before { background: var(--watt-color); }
+
+  .readout-value {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 56px;
+    line-height: 1;
+    letter-spacing: -1px;
+    transition: color 0.2s;
+  }
+  .readout-panel.volt .readout-value { color: var(--volt-color); }
+  .readout-panel.amp  .readout-value { color: var(--amp-color); }
+  .readout-panel.watt .readout-value { color: var(--watt-color); }
+
+  .readout-unit {
+    font-size: 16px;
+    color: var(--dim);
+    margin-left: 6px;
+    letter-spacing: 1px;
+  }
+
+  .readout-set {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    color: var(--dim);
+    margin-top: 8px;
+  }
+
+  /* Set controls */
+  .set-panel {
+    grid-column: span 1;
+  }
+
+  .set-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .btn-updown {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--dim);
+    font-size: 10px;
+    padding: 2px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: 'Barlow Condensed', sans-serif;
+  }
+  .btn-updown:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--panel);
+  }
+
+  .set-label {
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--dim);
+    width: 40px;
+    flex-shrink: 0;
+  }
+
+  .set-input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 16px;
+    padding: 7px 10px;
+    outline: none;
+    width: 100%;
+  }
+  .set-input:focus { border-color: var(--accent); }
+
+  .btn-set {
+    border-color: var(--dim);
+    color: var(--dim);
+    padding: 7px 12px;
+    font-size: 11px;
+  }
+  .btn-set:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Chart panel */
+  .chart-panel {
+    grid-column: span 4;
+    padding: 16px 24px;
+  }
+
+  .chart-controls {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 12px;
+    align-items: center;
+  }
+
+  .chart-toggle {
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    color: var(--dim);
+    background: transparent;
+    font-family: 'Barlow Condensed', sans-serif;
+    transition: all 0.15s;
+  }
+  .chart-toggle.active-v { border-color: var(--volt-color); color: var(--volt-color); }
+  .chart-toggle.active-a { border-color: var(--amp-color);  color: var(--amp-color); }
+  .chart-toggle.active-w { border-color: var(--watt-color); color: var(--watt-color); }
+
+  canvas {
+    width: 100%;
+    height: 200px;
+    display: block;
+    cursor: crosshair;
+  }
+
+  /* Log panel */
+  .log-panel {
+    grid-column: span 4;
+    max-height: 120px;
+    overflow-y: auto;
+    padding: 10px 24px;
+    border-top: 1px solid var(--border);
+  }
+
+  .log-line {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--dim);
+    line-height: 1.8;
+  }
+  .log-line.tx { color: var(--accent); }
+  .log-line.rx { color: var(--text); }
+  .log-line.err { color: var(--accent2); }
+  .log-line.info { color: var(--warn); }
+
+  /* Manual command */
+  .cmd-bar {
+    display: flex;
+    gap: 8px;
+    padding: 10px 24px;
+    border-top: 1px solid var(--border);
+    background: var(--panel);
+  }
+
+  .cmd-input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--accent);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    padding: 8px 12px;
+    outline: none;
+  }
+  .cmd-input:focus { border-color: var(--accent); }
+  .cmd-input::placeholder { color: var(--dim); }
+
+  .btn-send {
+    border-color: var(--accent);
+    color: var(--accent);
+    font-size: 12px;
+    padding: 8px 20px;
+  }
+  .btn-send:hover { background: var(--accent); color: var(--bg); }
+
+  /* Limit inputs in set panel */
+  .limit-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .limit-item {
+    flex: 1;
+  }
+  .limit-item label {
+    display: block;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--dim);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+  }
+  .limit-item input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    padding: 5px 8px;
+    outline: none;
+  }
+  .limit-item input:focus { border-color: var(--warn); }
+
+  .poll-indicator {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--dim);
+    margin-left: auto;
+  }
+  .poll-indicator.active { color: var(--accent); }
+
+  @media (max-width: 700px) {
+    main { grid-template-columns: 1fr; }
+    .chart-panel, .log-panel { grid-column: span 1; }
+    .readout-value { font-size: 40px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">DC310S <span>//</span> CTRL</div>
+  <div class="conn-bar">
+    <div class="status-dot" id="statusDot"></div>
+    <select id="baudRate">
+      <option value="115200" selected>115200</option>
+      <option value="9600">9600</option>
+    </select>
+    <button class="btn btn-connect" id="btnConnect">CONNECT</button>
+  </div>
+</header>
+
+<main>
+  <!-- Voltage -->
+  <div class="panel readout-panel volt">
+    <div class="panel-label">Measured Voltage</div>
+    <div class="readout-value" id="measV">--.-<span class="readout-unit">V</span></div>
+    <div class="readout-set" id="setVDisplay">SET: -- V</div>
+  </div>
+
+  <!-- Current -->
+  <div class="panel readout-panel amp">
+    <div class="panel-label">Measured Current</div>
+    <div class="readout-value" id="measA">-.-<span class="readout-unit">A</span></div>
+    <div class="readout-set" id="setADisplay">SET: -- A</div>
+  </div>
+
+  <!-- Power -->
+  <div class="panel readout-panel watt">
+    <div class="panel-label">Calculated Power</div>
+    <div class="readout-value" id="measW">--.<span class="readout-unit">W</span></div>
+    <div class="readout-set" id="outputStatus">OUTPUT: --</div>
+  </div>
+
+  <!-- Watt-Hours -->
+  <div class="panel readout-panel" style="border-top: 2px solid var(--watt-color)">
+    <div class="panel-label">Energy Consumption</div>
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div class="readout-value" style="font-size:32px;color:var(--watt-color)" id="wattHourDisplay">0.000 Wh</div>
+      <button class="btn" style="border-color:var(--dim);color:var(--dim);font-size:10px;padding:4px 10px" onclick="clearWattHours()">CLEAR</button>
+    </div>
+  </div>
+
+  <!-- Set V/A -->
+  <div class="panel set-panel">
+    <div class="panel-label">Set Output</div>
+    <div class="set-row">
+      <span class="set-label" style="color:var(--amp-color)">AMP</span>
+      <div style="display:flex;flex-direction:column;flex:1;gap:2px">
+        <input class="set-input" id="inpCurrent" type="number" step="0.001" min="0" max="10" placeholder="0.000">
+        <div style="display:flex;gap:2px">
+          <button class="btn-updown" onclick="adjustValue('inpCurrent', 0.01)">▲</button>
+          <button class="btn-updown" onclick="adjustValue('inpCurrent', -0.01)">▼</button>
+        </div>
+      </div>
+      <button class="btn btn-set" onclick="setCurrent()">SET</button>
+    </div>
+    <div class="set-row">
+      <span class="set-label" style="color:var(--volt-color)">VOLT</span>
+      <div style="display:flex;flex-direction:column;flex:1;gap:2px">
+        <input class="set-input" id="inpVoltage" type="number" step="0.01" min="0" max="30" placeholder="0.00">
+        <div style="display:flex;gap:2px">
+          <button class="btn-updown" onclick="adjustValue('inpVoltage', 0.01)">▲</button>
+          <button class="btn-updown" onclick="adjustValue('inpVoltage', -0.01)">▼</button>
+        </div>
+      </div>
+      <button class="btn btn-set" onclick="setVoltage()">SET</button>
+    </div>
+  </div>
+
+  <!-- Limits -->
+  <div class="panel set-panel">
+    <div class="panel-label">Protection Limits</div>
+    <div class="limit-row">
+      <div class="limit-item">
+        <label>OVP Limit (V)</label>
+        <input id="inpOVP" type="number" step="0.01" min="0" max="31" placeholder="31.00">
+      </div>
+      <div class="limit-item">
+        <label>OCP Limit (A)</label>
+        <input id="inpOCP" type="number" step="0.001" min="0" max="10.5" placeholder="10.500">
+      </div>
+    </div>
+    <div style="display:flex; gap:8px; margin-top:10px">
+      <button class="btn btn-set" style="flex:1" onclick="setLimits()">APPLY LIMITS</button>
+    </div>
+  </div>
+
+  <!-- Output toggle + poll -->
+  <div class="panel set-panel" style="display:flex;flex-direction:column;justify-content:space-between">
+    <div>
+      <div class="panel-label">Output Control</div>
+      <button class="btn btn-output" id="btnOutput" onclick="toggleOutput()" disabled>OUTPUT OFF</button>
+    </div>
+    <div style="margin-top:16px">
+      <div class="panel-label">Poll Interval</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <input type="range" id="pollRange" min="500" max="5000" step="500" value="1000"
+          style="flex:1;accent-color:var(--accent)" oninput="updatePollInterval(this.value)">
+        <span class="poll-indicator" id="pollLabel">1.0s</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chart -->
+  <div class="panel chart-panel">
+    <div class="chart-controls">
+      <span class="panel-label" style="margin:0">LIVE GRAPH</span>
+      <button class="chart-toggle active-v" id="togV" onclick="toggleTrace('v')">VOLT</button>
+      <button class="chart-toggle active-a" id="togA" onclick="toggleTrace('a')">AMP</button>
+      <button class="chart-toggle active-w" id="togW" onclick="toggleTrace('w')">WATT</button>
+      <button class="btn" style="border-color:var(--dim);color:var(--dim);font-size:10px;padding:4px 10px;margin-left:auto" onclick="clearChart()">CLEAR</button>
+    </div>
+    <canvas id="chart"></canvas>
+  </div>
+</main>
+
+<!-- Log -->
+<div class="log-panel" id="logPanel"></div>
+
+<!-- Manual command -->
+<div class="cmd-bar">
+  <input class="cmd-input" id="cmdInput" placeholder="manual command (e.g. voltage? or output 1)" onkeydown="if(event.key==='Enter')sendManual()">
+  <button class="btn btn-send" onclick="sendManual()">SEND</button>
+</div>
+
+<script>
+// ─── State ───────────────────────────────────────────────────────────────────
+let port = null, reader = null, writer = null;
+let isConnected = false;
+let outputOn = false;
+let pollTimer = null;
+let pollInterval = 1000;
+let readBuffer = '';
+
+const MAX_POINTS = 120;
+const chartData = { v: [], a: [], w: [], labels: [], timestamps: [] };
+const showTrace  = { v: true, a: true, w: true };
+
+let hoveredPoint = null;
+let db = null;
+
+// Watt-hour tracking
+let wattHours = 0;
+let lastWattHourUpdate = null;
+
+// ─── IndexedDB Setup ─────────────────────────────────────────────────────────
+async function initDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('DC310S_Data', 2);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      db = request.result;
+      resolve(db);
+    };
+    request.onupgradeneeded = (e) => {
+      const database = e.target.result;
+      if (!database.objectStoreNames.contains('measurements')) {
+        const store = database.createObjectStore('measurements', { keyPath: 'id', autoIncrement: true });
+        store.createIndex('timestamp', 'timestamp', { unique: false });
+      }
+      if (!database.objectStoreNames.contains('wattHours')) {
+        database.createObjectStore('wattHours', { keyPath: 'id' });
+      }
+    };
+  });
+}
+
+async function saveDataPoint(v, a, w, timestamp) {
+  if (!db) return;
+  try {
+    const tx = db.transaction(['measurements'], 'readwrite');
+    const store = tx.objectStore('measurements');
+    await store.add({ voltage: v, current: a, power: w, timestamp: timestamp });
+  } catch(e) {
+    console.error('Failed to save data:', e);
+  }
+}
+
+async function saveWattHours(wh) {
+  if (!db) return;
+  try {
+    const tx = db.transaction(['wattHours'], 'readwrite');
+    const store = tx.objectStore('wattHours');
+    await store.put({ id: 'current', value: wh, timestamp: Date.now() });
+  } catch(e) {
+    console.error('Failed to save watt-hours:', e);
+  }
+}
+
+async function loadWattHours() {
+  if (!db) return 0;
+  try {
+    const tx = db.transaction(['wattHours'], 'readonly');
+    const store = tx.objectStore('wattHours');
+    const request = store.get('current');
+    return new Promise((resolve) => {
+      request.onsuccess = () => {
+        resolve(request.result ? request.result.value : 0);
+      };
+      request.onerror = () => resolve(0);
+    });
+  } catch(e) {
+    console.error('Failed to load watt-hours:', e);
+    return 0;
+  }
+}
+
+async function clearWattHours() {
+  wattHours = 0;
+  lastWattHourUpdate = null;
+  updateWattHourDisplay();
+  await saveWattHours(0);
+  log('Watt-hour counter cleared', 'info');
+}
+
+async function loadRecentData() {
+  if (!db) return;
+  try {
+    const tx = db.transaction(['measurements'], 'readonly');
+    const store = tx.objectStore('measurements');
+    const index = store.index('timestamp');
+    const cutoff = Date.now() - (24 * 60 * 60 * 1000); // Last 24 hours
+    const range = IDBKeyRange.lowerBound(cutoff);
+    const request = index.openCursor(range, 'prev');
+    
+    const data = [];
+    request.onsuccess = (e) => {
+      const cursor = e.target.result;
+      if (cursor && data.length < MAX_POINTS) {
+        data.unshift(cursor.value);
+        cursor.continue();
+      } else {
+        // Populate chart with loaded data
+        data.forEach(d => {
+          const t = new Date(d.timestamp).toLocaleTimeString('en-US', { hour12: false, hour:'2-digit', minute:'2-digit', second:'2-digit' });
+          chartData.labels.push(t);
+          chartData.timestamps.push(d.timestamp);
+          chartData.v.push(d.voltage);
+          chartData.a.push(d.current);
+          chartData.w.push(d.power);
+        });
+        drawChart();
+      }
+    };
+  } catch(e) {
+    console.error('Failed to load data:', e);
+  }
+}
+
+// ─── Serial ──────────────────────────────────────────────────────────────────
+document.getElementById('btnConnect').onclick = async () => {
+  if (!isConnected) await connect(); else await disconnect();
+};
+
+async function connect() {
+  if (!('serial' in navigator)) {
+    log('Web Serial API not supported. Use Chrome/Edge.', 'err');
+    return;
+  }
+  try {
+    port = await navigator.serial.requestPort();
+    const baud = parseInt(document.getElementById('baudRate').value);
+    await port.open({ baudRate: baud, dataBits: 8, stopBits: 1, parity: 'none' });
+    isConnected = true;
+    writer = port.writable.getWriter();
+    startRead();
+    setConnectedUI(true);
+    log('Connected @ ' + baud + ' baud', 'info');
+    await queryAll();
+    startPolling();
+  } catch(e) {
+    log('Connect failed: ' + e.message, 'err');
+  }
+}
+
+async function disconnect() {
+  stopPolling();
+  try {
+    if (reader) { await reader.cancel(); reader = null; }
+    if (writer) { writer.releaseLock(); writer = null; }
+    if (port)   { await port.close(); port = null; }
+  } catch(e) {}
+  isConnected = false;
+  setConnectedUI(false);
+  log('Disconnected', 'info');
+}
+
+function setConnectedUI(on) {
+  const btn = document.getElementById('btnConnect');
+  const dot = document.getElementById('statusDot');
+  const out = document.getElementById('btnOutput');
+  btn.textContent = on ? 'DISCONNECT' : 'CONNECT';
+  btn.className   = 'btn btn-connect' + (on ? ' connected' : '');
+  dot.className   = 'status-dot' + (on ? ' connected' : '');
+  out.disabled    = !on;
+}
+
+async function send(cmd) {
+  if (!writer) return;
+  const enc = new TextEncoder();
+  await writer.write(enc.encode(cmd + '\n'));
+  log('TX › ' + cmd.trim(), 'tx');
+}
+
+async function startRead() {
+  const decoder = new TextDecoder();
+  try {
+    while (port && port.readable) {
+      reader = port.readable.getReader();
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        readBuffer += decoder.decode(value);
+        let nl;
+        while ((nl = readBuffer.indexOf('\n')) !== -1) {
+          const line = readBuffer.slice(0, nl).replace(/\r/g, '').trim();
+          readBuffer = readBuffer.slice(nl + 1);
+          if (line) handleResponse(line);
+        }
+      }
+      reader.releaseLock();
+    }
+  } catch(e) {
+    if (isConnected) log('Read error: ' + e.message, 'err');
+  }
+}
+
+// ─── Response Handling ───────────────────────────────────────────────────────
+let pendingQuery = null;
+
+async function queryAll() {
+  await querySingle('measure:voltage?');
+  await querySingle('measure:current?');
+  await querySingle('voltage?');
+  await querySingle('current?');
+  await querySingle('voltage:limit?');
+  await querySingle('current:limit?');
+  await querySingle('output?');
+}
+
+function handleResponse(line) {
+  log('RX ‹ ' + line, 'rx');
+  const v = parseFloat(line);
+  const lc = line.toLowerCase();
+
+  if (lc === 'on' || lc === 'off') {
+    outputOn = lc === 'on';
+    updateOutputBtn();
+    document.getElementById('outputStatus').textContent = 'OUTPUT: ' + line.toUpperCase();
+    return;
+  }
+
+  if (!isNaN(v)) {
+    // We can't always know which value this is without tracking query order,
+    // so we use a simple rolling queue approach
+    receiveValue(v);
+  }
+}
+
+// Query with response tracking
+let pendingQueryResolve = null;
+let currentQueryType = null;
+
+async function querySingle(cmd) {
+  currentQueryType = cmd;
+  await send(cmd);
+  // Wait for response with timeout
+  return new Promise((resolve) => {
+    pendingQueryResolve = resolve;
+    setTimeout(() => {
+      if (pendingQueryResolve === resolve) {
+        pendingQueryResolve = null;
+        currentQueryType = null;
+        resolve();
+      }
+    }, 500); // 500ms timeout
+  });
+}
+
+async function pollCycle() {
+  await querySingle('measure:voltage?');
+  await querySingle('measure:current?');
+  await querySingle('output?');
+}
+
+function receiveValue(val) {
+  if (!currentQueryType) return;
+  
+  if (currentQueryType.includes('measure:voltage')) {
+    updateVoltage(val);
+  } else if (currentQueryType.includes('measure:current')) {
+    updateCurrent(val);
+  } else if (currentQueryType.includes('voltage?') && !currentQueryType.includes('measure')) {
+    document.getElementById('setVDisplay').textContent = 'SET: ' + val.toFixed(2) + ' V';
+    document.getElementById('inpVoltage').value = val.toFixed(2);
+  } else if (currentQueryType.includes('current?') && !currentQueryType.includes('measure')) {
+    document.getElementById('setADisplay').textContent = 'SET: ' + val.toFixed(3) + ' A';
+    document.getElementById('inpCurrent').value = val.toFixed(3);
+  } else if (currentQueryType.includes('voltage:limit?')) {
+    document.getElementById('inpOVP').value = val.toFixed(2);
+  } else if (currentQueryType.includes('current:limit?')) {
+    document.getElementById('inpOCP').value = val.toFixed(3);
+  }
+  
+  // Resolve the pending query
+  if (pendingQueryResolve) {
+    pendingQueryResolve();
+    pendingQueryResolve = null;
+    currentQueryType = null;
+  }
+}
+
+let latestV = null, latestA = null;
+
+function updateVoltage(v) {
+  latestV = v;
+  document.getElementById('measV').innerHTML = v.toFixed(2) + '<span class="readout-unit">V</span>';
+  updatePower();
+}
+
+function updateCurrent(a) {
+  latestA = a;
+  document.getElementById('measA').innerHTML = a.toFixed(3) + '<span class="readout-unit">A</span>';
+  updatePower();
+}
+
+function updatePower() {
+  if (latestV === null || latestA === null) return;
+  const w = latestV * latestA;
+  document.getElementById('measW').innerHTML = w.toFixed(2) + '<span class="readout-unit">W</span>';
+  pushChartData(latestV, latestA, w);
+  updateWattHours(w);
+}
+
+function updateWattHours(watts) {
+  const now = Date.now();
+  if (lastWattHourUpdate && outputOn) {
+    const hoursPassed = (now - lastWattHourUpdate) / (1000 * 60 * 60);
+    wattHours += watts * hoursPassed;
+    updateWattHourDisplay();
+    saveWattHours(wattHours);
+  }
+  lastWattHourUpdate = now;
+}
+
+function updateWattHourDisplay() {
+  const display = document.getElementById('wattHourDisplay');
+  if (wattHours < 1) {
+    display.textContent = (wattHours * 1000).toFixed(1) + ' mWh';
+  } else {
+    display.textContent = wattHours.toFixed(3) + ' Wh';
+  }
+}
+
+// ─── Commands ────────────────────────────────────────────────────────────────
+async function setVoltage() {
+  const v = parseFloat(document.getElementById('inpVoltage').value);
+  if (isNaN(v)) return;
+  await send('voltage ' + v.toFixed(2));
+  await delay(200);
+  await querySingle('voltage?');
+}
+
+async function setCurrent() {
+  const a = parseFloat(document.getElementById('inpCurrent').value);
+  if (isNaN(a)) return;
+  await send('current ' + a.toFixed(3));
+  await delay(200);
+  await querySingle('current?');
+}
+
+function adjustValue(inputId, delta) {
+  const input = document.getElementById(inputId);
+  const current = parseFloat(input.value) || 0;
+  const newVal = Math.max(0, current + delta);
+  const max = parseFloat(input.max);
+  const decimals = inputId === 'inpCurrent' ? 3 : 2;
+  input.value = Math.min(newVal, max).toFixed(decimals);
+  
+  // Automatically send the command
+  if (inputId === 'inpCurrent') {
+    setCurrent();
+  } else if (inputId === 'inpVoltage') {
+    setVoltage();
+  }
+}
+
+async function setLimits() {
+  const ovp = parseFloat(document.getElementById('inpOVP').value);
+  const ocp = parseFloat(document.getElementById('inpOCP').value);
+  if (!isNaN(ovp)) {
+    await send('voltage:limit ' + ovp.toFixed(2));
+    await delay(200);
+    await querySingle('voltage:limit?');
+  }
+  if (!isNaN(ocp)) {
+    await send('current:limit ' + ocp.toFixed(3));
+    await delay(200);
+    await querySingle('current:limit?');
+  }
+}
+
+async function toggleOutput() {
+  const next = outputOn ? 0 : 1;
+  await send('output ' + next);
+  await delay(200);
+  await querySingle('output?');
+}
+
+function updateOutputBtn() {
+  const btn = document.getElementById('btnOutput');
+  if (outputOn) {
+    btn.textContent = 'OUTPUT ON';
+    btn.className = 'btn btn-output on';
+  } else {
+    btn.textContent = 'OUTPUT OFF';
+    btn.className = 'btn btn-output off';
+  }
+}
+
+async function sendManual() {
+  const inp = document.getElementById('cmdInput');
+  const cmd = inp.value.trim();
+  if (!cmd || !writer) return;
+  const isQuery = cmd.endsWith('?');
+  if (isQuery) {
+    await querySingle(cmd);
+  } else {
+    await send(cmd);
+  }
+  inp.value = '';
+}
+
+// ─── Polling ─────────────────────────────────────────────────────────────────
+function startPolling() {
+  stopPolling();
+  pollTimer = setInterval(pollCycle, pollInterval);
+}
+
+function stopPolling() {
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+}
+
+function updatePollInterval(val) {
+  pollInterval = parseInt(val);
+  const lbl = document.getElementById('pollLabel');
+  lbl.textContent = (pollInterval / 1000).toFixed(1) + 's';
+  lbl.className = 'poll-indicator active';
+  if (isConnected) startPolling();
+}
+
+// ─── Chart ───────────────────────────────────────────────────────────────────
+const canvas = document.getElementById('chart');
+const ctx = canvas.getContext('2d');
+
+// Mouse tracking for tooltips
+let mouseX = -1, mouseY = -1;
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  mouseX = (e.clientX - rect.left) * devicePixelRatio;
+  mouseY = (e.clientY - rect.top) * devicePixelRatio;
+  drawChart();
+});
+canvas.addEventListener('mouseleave', () => {
+  mouseX = -1;
+  mouseY = -1;
+  drawChart();
+});
+
+function resizeCanvas() {
+  canvas.width  = canvas.offsetWidth  * devicePixelRatio;
+  canvas.height = canvas.offsetHeight * devicePixelRatio;
+  drawChart();
+}
+window.addEventListener('resize', resizeCanvas);
+setTimeout(resizeCanvas, 100);
+
+function pushChartData(v, a, w) {
+  const timestamp = Date.now();
+  const t = new Date(timestamp).toLocaleTimeString('en-US', { hour12: false, hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  chartData.labels.push(t);
+  chartData.timestamps.push(timestamp);
+  chartData.v.push(v);
+  chartData.a.push(a);
+  chartData.w.push(w);
+  if (chartData.labels.length > MAX_POINTS) {
+    chartData.labels.shift();
+    chartData.timestamps.shift();
+    chartData.v.shift(); chartData.a.shift(); chartData.w.shift();
+  }
+  saveDataPoint(v, a, w, timestamp);
+  drawChart();
+}
+
+function toggleTrace(key) {
+  showTrace[key] = !showTrace[key];
+  const map = { v: ['togV','active-v'], a: ['togA','active-a'], w: ['togW','active-w'] };
+  const [id, cls] = map[key];
+  const btn = document.getElementById(id);
+  if (showTrace[key]) btn.classList.add(cls); else btn.classList.remove(cls);
+  drawChart();
+}
+
+function clearChart() {
+  chartData.labels.length = 0;
+  chartData.timestamps.length = 0;
+  chartData.v.length = 0; chartData.a.length = 0; chartData.w.length = 0;
+  drawChart();
+}
+
+function drawChart() {
+  const W = canvas.width, H = canvas.height;
+  const dpr = devicePixelRatio;
+  ctx.clearRect(0, 0, W, H);
+
+  // Background with gradient
+  const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
+  bgGrad.addColorStop(0, '#0d0f0f');
+  bgGrad.addColorStop(1, '#080909');
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, W, H);
+
+  const PAD = { top: 16*dpr, right: 20*dpr, bottom: 32*dpr, left: 56*dpr };
+  const cW = W - PAD.left - PAD.right;
+  const cH = H - PAD.top  - PAD.bottom;
+
+  // Grid with subtle lines
+  ctx.strokeStyle = '#1a2020';
+  ctx.lineWidth   = 1;
+  const gridLines = 5;
+  for (let i = 0; i <= gridLines; i++) {
+    const y = PAD.top + (i / gridLines) * cH;
+    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left + cW, y); ctx.stroke();
+  }
+  // Vertical grid lines
+  const vGridLines = 6;
+  for (let i = 0; i <= vGridLines; i++) {
+    const x = PAD.left + (i / vGridLines) * cW;
+    ctx.beginPath(); ctx.moveTo(x, PAD.top); ctx.lineTo(x, PAD.top + cH); ctx.stroke();
+  }
+
+  const n = chartData.labels.length;
+  if (n < 2) {
+    // Empty state
+    ctx.fillStyle = '#2a3535';
+    ctx.font = `${14*dpr}px 'Share Tech Mono', monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText('AWAITING DATA', W/2, H/2);
+    return;
+  }
+
+  const traces = [
+    { key: 'v', data: chartData.v, color: '#00e5a0', label: 'V' },
+    { key: 'a', data: chartData.a, color: '#ff6b35', label: 'A' },
+    { key: 'w', data: chartData.w, color: '#ffd166', label: 'W' },
+  ];
+
+  let closestPoint = null;
+  let closestDist = Infinity;
+
+  traces.forEach(({ key, data, color, label }) => {
+    if (!showTrace[key] || data.length < 2) return;
+    const mn = Math.min(...data), mx = Math.max(...data);
+    const range = mx - mn || 1;
+    const pad = range * 0.1;
+
+    // Draw line with gradient
+    const lineGrad = ctx.createLinearGradient(0, PAD.top, 0, PAD.top + cH);
+    lineGrad.addColorStop(0, color);
+    lineGrad.addColorStop(1, color + '80');
+    
+    ctx.strokeStyle = color;
+    ctx.lineWidth   = 2.5 * dpr;
+    ctx.shadowColor = color;
+    ctx.shadowBlur  = 6 * dpr;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    
+    ctx.beginPath();
+    const points = [];
+    data.forEach((val, i) => {
+      const x = PAD.left + (i / (n - 1)) * cW;
+      const y = PAD.top + cH - ((val - mn + pad) / (range + 2 * pad)) * cH;
+      points.push({ x, y, val, idx: i });
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      
+      // Check distance to mouse
+      if (mouseX >= 0 && mouseY >= 0) {
+        const dist = Math.sqrt((mouseX - x) ** 2 + (mouseY - y) ** 2);
+        if (dist < closestDist && dist < 30 * dpr) {
+          closestDist = dist;
+          closestPoint = { x, y, val, idx: i, color, label, key };
+        }
+      }
+    });
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Fill area under curve
+    if (showTrace[key]) {
+      ctx.lineTo(PAD.left + cW, PAD.top + cH);
+      ctx.lineTo(PAD.left, PAD.top + cH);
+      ctx.closePath();
+      const areaGrad = ctx.createLinearGradient(0, PAD.top, 0, PAD.top + cH);
+      areaGrad.addColorStop(0, color + '20');
+      areaGrad.addColorStop(1, color + '05');
+      ctx.fillStyle = areaGrad;
+      ctx.fill();
+    }
+
+    // Y axis label (last value)
+    ctx.fillStyle = color;
+    ctx.font = `${11*dpr}px 'Share Tech Mono', monospace`;
+    ctx.textAlign = 'right';
+    const lastVal = data[data.length - 1];
+    const lastY = PAD.top + cH - ((lastVal - mn + pad) / (range + 2 * pad)) * cH;
+    ctx.fillText(lastVal.toFixed(2) + label, PAD.left - 6*dpr, lastY + 4*dpr);
+  });
+
+  // Draw tooltip
+  if (closestPoint) {
+    const { x, y, val, idx, color, label, key } = closestPoint;
+    
+    // Draw point
+    ctx.beginPath();
+    ctx.arc(x, y, 5 * dpr, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = '#0d0f0f';
+    ctx.lineWidth = 2 * dpr;
+    ctx.stroke();
+    
+    // Draw tooltip box
+    const tooltipText = `${val.toFixed(2)} ${label}`;
+    const timeText = chartData.labels[idx];
+    ctx.font = `${12*dpr}px 'Share Tech Mono', monospace`;
+    const textWidth = Math.max(ctx.measureText(tooltipText).width, ctx.measureText(timeText).width);
+    const boxW = textWidth + 16*dpr;
+    const boxH = 40*dpr;
+    
+    let boxX = x + 12*dpr;
+    let boxY = y - boxH/2;
+    
+    // Keep tooltip in bounds
+    if (boxX + boxW > W - PAD.right) boxX = x - boxW - 12*dpr;
+    if (boxY < PAD.top) boxY = PAD.top;
+    if (boxY + boxH > H - PAD.bottom) boxY = H - PAD.bottom - boxH;
+    
+    // Draw box with shadow
+    ctx.shadowColor = 'rgba(0,0,0,0.5)';
+    ctx.shadowBlur = 10 * dpr;
+    ctx.fillStyle = '#1a2020';
+    ctx.fillRect(boxX, boxY, boxW, boxH);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(boxX, boxY, boxW, boxH);
+    ctx.shadowBlur = 0;
+    
+    // Draw text
+    ctx.fillStyle = color;
+    ctx.textAlign = 'left';
+    ctx.fillText(tooltipText, boxX + 8*dpr, boxY + 16*dpr);
+    ctx.fillStyle = '#4a5a5a';
+    ctx.font = `${10*dpr}px 'Share Tech Mono', monospace`;
+    ctx.fillText(timeText, boxX + 8*dpr, boxY + 30*dpr);
+  }
+
+  // X axis labels (first / mid / last)
+  ctx.fillStyle = '#3a5050';
+  ctx.font = `${10*dpr}px 'Share Tech Mono', monospace`;
+  ctx.textAlign = 'left';
+  ctx.fillText(chartData.labels[0], PAD.left, H - 8*dpr);
+  ctx.textAlign = 'center';
+  ctx.fillText(chartData.labels[Math.floor(n/2)], W/2, H - 8*dpr);
+  ctx.textAlign = 'right';
+  ctx.fillText(chartData.labels[n-1], PAD.left + cW, H - 8*dpr);
+}
+
+// ─── Log ─────────────────────────────────────────────────────────────────────
+const MAX_LOG = 200;
+let logCount = 0;
+
+function log(msg, type = 'info') {
+  const panel = document.getElementById('logPanel');
+  const line  = document.createElement('div');
+  line.className = 'log-line ' + type;
+  const ts = new Date().toLocaleTimeString('en-US', { hour12: false });
+  line.textContent = '[' + ts + '] ' + msg;
+  panel.appendChild(line);
+  logCount++;
+  if (logCount > MAX_LOG) panel.removeChild(panel.firstChild);
+  panel.scrollTop = panel.scrollHeight;
+}
+
+// ─── Utils ───────────────────────────────────────────────────────────────────
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// Initialize
+(async function init() {
+  await initDB();
+  wattHours = await loadWattHours();
+  updateWattHourDisplay();
+  await loadRecentData();
+  drawChart();
+  log('Ready. Click CONNECT to open serial port.', 'info');
+})();
+</script>
+</body>
+</html>
